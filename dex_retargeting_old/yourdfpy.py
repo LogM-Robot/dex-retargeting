@@ -200,11 +200,7 @@ class Collision:
     def __eq__(self, other):
         if not isinstance(other, Collision):
             return NotImplemented
-        return (
-            self.name == other.name
-            and _array_eq(self.origin, other.origin)
-            and self.geometry == other.geometry
-        )
+        return self.name == other.name and _array_eq(self.origin, other.origin) and self.geometry == other.geometry
 
 
 @dataclass(eq=False)
@@ -217,9 +213,7 @@ class Inertial:
         if not isinstance(other, Inertial):
             return NotImplemented
         return (
-            _array_eq(self.origin, other.origin)
-            and self.mass == other.mass
-            and _array_eq(self.inertia, other.inertia)
+            _array_eq(self.origin, other.origin) and self.mass == other.mass and _array_eq(self.inertia, other.inertia)
         )
 
 
@@ -309,12 +303,8 @@ class Robot:
             and all(other_joint in self.joints for other_joint in other.joints)
             and all(self_material in other.materials for self_material in self.materials)
             and all(other_material in self.materials for other_material in other.materials)
-            and all(
-                self_transmission in other.transmission for self_transmission in self.transmission
-            )
-            and all(
-                other_transmission in self.transmission for other_transmission in other.transmission
-            )
+            and all(self_transmission in other.transmission for self_transmission in self.transmission)
+            and all(other_transmission in self.transmission for other_transmission in other.transmission)
             and all(self_gazebo in other.gazebo for self_gazebo in self.gazebo)
             and all(other_gazebo in self.gazebo for other_gazebo in other.gazebo)
         )
@@ -501,9 +491,7 @@ def filename_handler_relative_to_urdf_file(fname, urdf_fname):
 def filename_handler_relative_to_urdf_file_recursive(fname, urdf_fname, level=0):
     if level == 0:
         return filename_handler_relative_to_urdf_file(fname, urdf_fname)
-    return filename_handler_relative_to_urdf_file_recursive(
-        fname, os.path.split(urdf_fname)[0], level=level - 1
-    )
+    return filename_handler_relative_to_urdf_file_recursive(fname, os.path.split(urdf_fname)[0], level=level - 1)
 
 
 def _create_filename_handlers_to_urdf_file_recursive(urdf_fname):
@@ -835,9 +823,7 @@ class URDF:
                 self._scene_collision.show(callback=callback)
         else:
             if self._scene is None:
-                raise ValueError(
-                    "No scene available. Use build_scene_graph=True and load_meshes=True during loading."
-                )
+                raise ValueError("No scene available. Use build_scene_graph=True and load_meshes=True during loading.")
             elif len(self._scene.bounds_corners) < 1:
                 raise ValueError(
                     "Scene is empty, maybe meshes failed to load? Use build_scene_graph=True and load_meshes=True during loading."
@@ -890,9 +876,7 @@ class URDF:
                     self._actuated_dof_indices.append([dof_indices_cnt])
                     dof_indices_cnt += 1
                 elif j.type == "floating":
-                    self._actuated_dof_indices.append(
-                        [dof_indices_cnt, dof_indices_cnt + 1, dof_indices_cnt + 2]
-                    )
+                    self._actuated_dof_indices.append([dof_indices_cnt, dof_indices_cnt + 1, dof_indices_cnt + 2])
                     dof_indices_cnt += 3
                 elif j.type == "planar":
                     self._actuated_dof_indices.append([dof_indices_cnt, dof_indices_cnt + 1])
@@ -951,10 +935,7 @@ class URDF:
             for action, elem in xml:
                 # Skip comments and processing instructions,
                 # because they do not have names
-                if not (
-                    isinstance(elem, etree._Comment)
-                    or isinstance(elem, etree._ProcessingInstruction)
-                ):
+                if not (isinstance(elem, etree._Comment) or isinstance(elem, etree._ProcessingInstruction)):
                     # Remove a namespace URI in the element's name
                     # elem.tag = etree.QName(elem).localname
                     if action == "end" and ":" in elem.tag:
@@ -967,10 +948,7 @@ class URDF:
         etree.cleanup_namespaces(xml_root)
 
         return URDF(
-            robot=URDF._parse_robot(
-                xml_element=xml_root, add_dummy_free_joints=add_dummy_free_joints
-            ),
-            **kwargs,
+            robot=URDF._parse_robot(xml_element=xml_root, add_dummy_free_joints=add_dummy_free_joints), **kwargs
         )
 
     def contains(self, key, value, element=None) -> bool:
@@ -992,15 +970,9 @@ class URDF:
             field_value = getattr(element, field)
             if is_dataclass(field_value):
                 result = result or self.contains(key=key, value=value, element=field_value)
-            elif (
-                isinstance(field_value, list)
-                and len(field_value) > 0
-                and is_dataclass(field_value[0])
-            ):
+            elif isinstance(field_value, list) and len(field_value) > 0 and is_dataclass(field_value[0]):
                 for field_value_element in field_value:
-                    result = result or self.contains(
-                        key=key, value=value, element=field_value_element
-                    )
+                    result = result or self.contains(key=key, value=value, element=field_value_element)
             else:
                 if key == field and value == field_value:
                     result = True
@@ -1040,9 +1012,7 @@ class URDF:
         if joint.type in ["revolute", "prismatic", "continuous"]:
             if q is None:
                 # Use internal cfg vector for forward kinematics
-                q = float(
-                    self.cfg[self.actuated_dof_indices[self.actuated_joint_names.index(joint.name)]]
-                )
+                q = float(self.cfg[self.actuated_dof_indices[self.actuated_joint_names.index(joint.name)]])
 
             if joint.type == "prismatic":
                 matrix = origin @ tra.translation_matrix(q * joint.axis)
@@ -1093,16 +1063,12 @@ class URDF:
 
             # update internal configuration vector - only consider actuated joints
             if j.name in self.actuated_joint_names:
-                self._cfg[self.actuated_dof_indices[self.actuated_joint_names.index(j.name)]] = (
-                    joint_q
-                )
+                self._cfg[self.actuated_dof_indices[self.actuated_joint_names.index(j.name)]] = joint_q
 
             if self._scene is not None:
                 self._scene.graph.update(frame_from=j.parent, frame_to=j.child, matrix=matrix)
             if self._scene_collision is not None:
-                self._scene_collision.graph.update(
-                    frame_from=j.parent, frame_to=j.child, matrix=matrix
-                )
+                self._scene_collision.graph.update(frame_from=j.parent, frame_to=j.child, matrix=matrix)
 
     def get_transform(self, frame_to, frame_from=None, collision_geometry=False):
         """Get the transform from one frame to another.
@@ -1120,9 +1086,7 @@ class URDF:
         """
         if collision_geometry:
             if self._scene_collision is None:
-                raise ValueError(
-                    "No collision scene available. Use build_collision_scene_graph=True during loading."
-                )
+                raise ValueError("No collision scene available. Use build_collision_scene_graph=True during loading.")
             else:
                 return self._scene_collision.graph.get(frame_to=frame_to, frame_from=frame_from)[0]
         else:
@@ -1254,9 +1218,7 @@ class URDF:
                     else:
                         # The following map is used to deal with glb format
                         # when the graph node and geometry have different names
-                        geom_name_map = {
-                            new_s.graph[node_name][1]: node_name for node_name in new_s.graph.nodes
-                        }
+                        geom_name_map = {new_s.graph[node_name][1]: node_name for node_name in new_s.graph.nodes}
                         for name, geom in new_s.geometry.items():
                             if isinstance(v, Visual):
                                 apply_visual_color(geom, v, self._material_map)
@@ -1350,9 +1312,7 @@ class URDF:
         Returns:
             list[(np.ndarray, yourdfpy.URDF)]: A list of tuples (np.ndarray, yourdfpy.URDF) whereas each homogeneous 4x4 matrix describes the root transformation of the respective URDF model w.r.t. the original URDF.
         """
-        root_urdf = URDF(
-            robot=copy.deepcopy(self.robot), build_scene_graph=False, load_meshes=False
-        )
+        root_urdf = URDF(robot=copy.deepcopy(self.robot), build_scene_graph=False, load_meshes=False)
         result = []
 
         joint_types = joint_type if isinstance(joint_type, list) else [joint_type]
@@ -1382,9 +1342,7 @@ class URDF:
             # remove joint that connects root urdf to root_link
             if root_link.name in [j.child for j in root_urdf.robot.joints]:
                 root_urdf.robot.joints.remove(
-                    root_urdf.robot.joints[
-                        [j.child for j in root_urdf.robot.joints].index(root_link.name)
-                    ]
+                    root_urdf.robot.joints[[j.child for j in root_urdf.robot.joints].index(root_link.name)]
                 )
 
         result.insert(0, (np.eye(4), URDF(robot=root_urdf.robot, **kwargs)))
@@ -1393,9 +1351,7 @@ class URDF:
 
     def validate_filenames(self):
         for l in self.robot.links:
-            meshes = [
-                m.geometry.mesh for m in l.collisions + l.visuals if m.geometry.mesh is not None
-            ]
+            meshes = [m.geometry.mesh for m in l.collisions + l.visuals if m.geometry.mesh is not None]
             for m in meshes:
                 _logger.debug(m.filename, "-->", self._filename_handler(m.filename))
                 if not os.path.isfile(self._filename_handler(m.filename)):
@@ -1911,9 +1867,7 @@ class URDF:
         return link
 
     def _validate_link(self, link):
-        self._validate_required_attribute(
-            attribute=link.name, error_msg="The <link> tag misses a 'name' attribute."
-        )
+        self._validate_required_attribute(attribute=link.name, error_msg="The <link> tag misses a 'name' attribute.")
 
         for v in link.visuals:
             self._validate_visual(v)
@@ -2054,9 +2008,7 @@ class URDF:
         joint.dynamics = URDF._parse_dynamics(xml_element.find("dynamics"))
         joint.mimic = URDF._parse_mimic(xml_element.find("mimic"))
         joint.calibration = URDF._parse_calibration(xml_element.find("calibration"))
-        joint.safety_controller = URDF._parse_safety_controller(
-            xml_element.find("safety_controller")
-        )
+        joint.safety_controller = URDF._parse_safety_controller(xml_element.find("safety_controller"))
 
         return joint
 
@@ -2188,9 +2140,7 @@ class URDF:
             bfs_link_list.extend(children)
         bfs_joint_list = []
         for link_name in bfs_link_list[1:]:
-            joint_index = [
-                i for i in range(len(self.robot.joints)) if self.robot.joints[i].child == link_name
-            ][0]
+            joint_index = [i for i in range(len(self.robot.joints)) if self.robot.joints[i].child == link_name][0]
             bfs_joint_list.append(self.robot.joints[joint_index])
 
         # Build tree
@@ -2245,28 +2195,19 @@ class URDF:
 
 def _add_dummy_joints(robot: Robot, root_link_name: str):
     # Prepare link and joint properties
-    translation_range = (-0.180, 0.180)
-    rotation_range = (-0.25 * np.pi, 0.25 * np.pi)
-
-    # translation_range = (-0.0, 0.0)
-    # rotation_range = (-0.0 * np.pi, 0.0 * np.pi)
-
+    translation_range = (-5, 5)
+    rotation_range = (-2 * np.pi, 2 * np.pi)
     joint_types = ["prismatic"] * 3 + ["revolute"] * 3
-    # joint_limit = [(-0.300, -0.100)] + [(-0.08, 0.08)] + [translation_range] + [rotation_range] + [(-0.05 * np.pi, 0.25 * np.pi)] + [(-0.2 * np.pi, 0.0)]
     joint_limit = [translation_range] * 3 + [rotation_range] * 3
     joint_name = DUMMY_JOINT_NAMES.copy()
-    link_name = [f"dummy_{name}_translation_link" for name in "xyz"] + [
-        f"dummy_{name}_rotation_link" for name in "xyz"
-    ]
+    link_name = [f"dummy_{name}_translation_link" for name in "xyz"] + [f"dummy_{name}_rotation_link" for name in "xyz"]
 
     links = []
     joints = []
 
     for i in range(6):
         inertial = Inertial(
-            mass=0.01,
-            inertia=np.array([[1e-4, 0, 0], [0, 1e-4, 0], [0, 0, 1e-4]]),
-            origin=np.identity(4),
+            mass=0.01, inertia=np.array([[1e-4, 0, 0], [0, 1e-4, 0], [0, 0, 1e-4]]), origin=np.identity(4)
         )
         link = Link(name=link_name[i], inertial=inertial)
         links.append(link)

@@ -1,11 +1,10 @@
 from abc import abstractmethod
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 import nlopt
 import numpy as np
 import torch
 
-from scipy.spatial.transform import Rotation as R
 from dex_retargeting.kinematics_adaptor import KinematicAdaptor, MimicJointKinematicAdaptor
 from dex_retargeting.robot_wrapper import RobotWrapper
 
@@ -14,17 +13,13 @@ class Optimizer:
     retargeting_type = "BASE"
 
     def __init__(
-            self,
-            robot: RobotWrapper,
-            target_joint_names: List[str],
-            target_link_human_indices: np.ndarray,
+        self,
+        robot: RobotWrapper,
+        target_joint_names: List[str],
+        target_link_human_indices: np.ndarray,
     ):
         self.robot = robot
         self.num_joints = robot.dof
-
-        print(f"target_joint_names: {target_joint_names}")
-        print(f"robot.dof_joint_names: {robot.dof_joint_names}")
-        print(f"dof: {robot.dof}")
 
         joint_names = robot.dof_joint_names
         idx_pin2target = []
@@ -48,9 +43,6 @@ class Optimizer:
 
         # Kinematics adaptor
         self.adaptor: Optional[KinematicAdaptor] = None
-
-        # Loss
-        self.loss = None
 
     def set_joint_limit(self, joint_limits: np.ndarray, epsilon=1e-3):
         if joint_limits.shape != (self.opt_dof, 2):
@@ -91,7 +83,6 @@ class Optimizer:
         self.opt.set_min_objective(objective_fn)
         try:
             qpos = self.opt.optimize(last_qpos)
-            self.loss = objective_fn(qpos, np.array([]))
             return np.array(qpos, dtype=np.float32)
         except RuntimeError as e:
             print(e)
@@ -111,53 +102,28 @@ class PositionOptimizer(Optimizer):
     retargeting_type = "POSITION"
 
     def __init__(
-            self,
-            robot: RobotWrapper,
-            target_joint_names: List[str],
-            target_link_names: List[str],
-            target_link_human_indices: np.ndarray,
-            target_link_weights: List = None,
-            target_link_offsets: Dict = None,
-            huber_delta=0.02,
-            norm_delta=4e-3,
-            scaling=1.0,
+        self,
+        robot: RobotWrapper,
+        target_joint_names: List[str],
+        target_link_names: List[str],
+        target_link_human_indices: np.ndarray,
+        huber_delta=0.02,
+        norm_delta=4e-3,
     ):
         super().__init__(robot, target_joint_names, target_link_human_indices)
         self.body_names = target_link_names
-        self.huber_loss = torch.nn.SmoothL1Loss(beta=huber_delta, reduction="none")
+        self.huber_loss = torch.nn.SmoothL1Loss(beta=huber_delta)
         self.norm_delta = norm_delta
-        self.scaling = scaling
 
         # Sanity check and cache link indices
         self.target_link_indices = self.get_link_indices(target_link_names)
-        self.target_link_weights = target_link_weights
-        if self.target_link_weights is None:
-            self.target_link_weights = np.ones(len(target_link_names))
-        self.target_link_weights = torch.from_numpy(np.array(self.target_link_weights)).float().reshape(-1, 1)
-        self.target_link_offsets = target_link_offsets
-        if self.target_link_offsets is None:
-            self.target_link_offsets = dict()
-        self.target_link_transforms = []
-        for link in target_link_names:
-            self.target_link_transforms.append(np.identity(4))
-            if link in self.target_link_offsets:
-                p, r = self.target_link_offsets[link]
-                if p is None:
-                    p = np.array([0, 0, 0])
-                if r is None:
-                    r = np.array([0, 0, 0])
-                r = R.from_euler("xyz", r, degrees=True).as_matrix()
-                self.target_link_transforms[-1][:3, :3] = r
-                self.target_link_transforms[-1][:3, 3] = p
-        self.target_link_transforms = np.stack(self.target_link_transforms)
 
         self.opt.set_ftol_abs(1e-5)
 
     def get_objective_function(self, target_pos: np.ndarray, fixed_qpos: np.ndarray, last_qpos: np.ndarray):
         qpos = np.zeros(self.num_joints)
         qpos[self.idx_pin2fixed] = fixed_qpos
-        torch_target_pos = torch.as_tensor(target_pos) * self.scaling
-        print(f"scaling_factor: {self.scaling}")
+        torch_target_pos = torch.as_tensor(target_pos)
         torch_target_pos.requires_grad_(False)
 
         def objective(x: np.ndarray, grad: np.ndarray) -> float:
@@ -168,8 +134,7 @@ class PositionOptimizer(Optimizer):
                 qpos[:] = self.adaptor.forward_qpos(qpos)[:]
 
             self.robot.compute_forward_kinematics(qpos)
-            target_link_poses = [np.dot(self.robot.get_link_pose(index), self.target_link_transforms[i])
-                                 for i, index in enumerate(self.target_link_indices)]
+            target_link_poses = [self.robot.get_link_pose(index) for index in self.target_link_indices]
             body_pos = np.stack([pose[:3, 3] for pose in target_link_poses], axis=0)  # (n ,3)
 
             # Torch computation for accurate loss and grad
@@ -177,7 +142,7 @@ class PositionOptimizer(Optimizer):
             torch_body_pos.requires_grad_()
 
             # Loss term for kinematics retargeting based on 3D position error
-            huber_distance = torch.mean(self.target_link_weights * self.huber_loss(torch_body_pos, torch_target_pos))
+            huber_distance = self.huber_loss(torch_body_pos, torch_target_pos)
             result = huber_distance.cpu().detach().item()
 
             if grad.size > 0:
@@ -216,15 +181,15 @@ class VectorOptimizer(Optimizer):
     retargeting_type = "VECTOR"
 
     def __init__(
-            self,
-            robot: RobotWrapper,
-            target_joint_names: List[str],
-            target_origin_link_names: List[str],
-            target_task_link_names: List[str],
-            target_link_human_indices: np.ndarray,
-            huber_delta=0.02,
-            norm_delta=4e-3,
-            scaling=1.0,
+        self,
+        robot: RobotWrapper,
+        target_joint_names: List[str],
+        target_origin_link_names: List[str],
+        target_task_link_names: List[str],
+        target_link_human_indices: np.ndarray,
+        huber_delta=0.02,
+        norm_delta=4e-3,
+        scaling=1.0,
     ):
         super().__init__(robot, target_joint_names, target_link_human_indices)
         self.origin_link_names = target_origin_link_names
@@ -333,21 +298,21 @@ class DexPilotOptimizer(Optimizer):
     retargeting_type = "DEXPILOT"
 
     def __init__(
-            self,
-            robot: RobotWrapper,
-            target_joint_names: List[str],
-            finger_tip_link_names: List[str],
-            wrist_link_name: str,
-            target_link_human_indices: Optional[np.ndarray] = None,
-            huber_delta=0.03,
-            norm_delta=4e-3,
-            # DexPilot parameters
-            # gamma=2.5e-3,
-            project_dist=0.03,
-            escape_dist=0.05,
-            eta1=1e-4,
-            eta2=3e-2,
-            scaling=1.0,
+        self,
+        robot: RobotWrapper,
+        target_joint_names: List[str],
+        finger_tip_link_names: List[str],
+        wrist_link_name: str,
+        target_link_human_indices: Optional[np.ndarray] = None,
+        huber_delta=0.03,
+        norm_delta=4e-3,
+        # DexPilot parameters
+        # gamma=2.5e-3,
+        project_dist=0.03,
+        escape_dist=0.05,
+        eta1=1e-4,
+        eta2=3e-2,
+        scaling=1.0,
     ):
         if len(finger_tip_link_names) < 2 or len(finger_tip_link_names) > 5:
             raise ValueError(
@@ -506,7 +471,7 @@ class DexPilotOptimizer(Optimizer):
             # Different from the original DexPilot, we use huber loss here instead of the squared dist
             vec_dist = torch.norm(robot_vec - torch_target_vec, dim=1, keepdim=False)
             huber_distance = (
-                    self.huber_loss(vec_dist, torch.zeros_like(vec_dist)) * weight / (robot_vec.shape[0])
+                self.huber_loss(vec_dist, torch.zeros_like(vec_dist)) * weight / (robot_vec.shape[0])
             ).sum()
             huber_distance = huber_distance.sum()
             result = huber_distance.cpu().detach().item()

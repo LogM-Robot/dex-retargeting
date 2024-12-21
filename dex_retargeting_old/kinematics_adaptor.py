@@ -43,13 +43,13 @@ class KinematicAdaptor:
 
 class MimicJointKinematicAdaptor(KinematicAdaptor):
     def __init__(
-            self,
-            robot: RobotWrapper,
-            target_joint_names: List[str],
-            source_joint_names: List[str],
-            mimic_joint_names: List[str],
-            multipliers: List[float],
-            offsets: List[float],
+        self,
+        robot: RobotWrapper,
+        target_joint_names: List[str],
+        source_joint_names: List[str],
+        mimic_joint_names: List[str],
+        multipliers: List[float],
+        offsets: List[float],
     ):
         super().__init__(robot, target_joint_names)
 

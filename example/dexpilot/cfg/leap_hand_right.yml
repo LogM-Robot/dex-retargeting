@@ -1,0 +1,40 @@
+retargeting:
+  type: position   # vector
+  urdf_path: leap_hand_dottip_right_wo_col_retarget.urdf
+
+  # Target refers to the retargeting target, which is the robot hand
+  # target_origin_link_names: [ "base", "base", "base", "base" ]
+  target_joint_names: ["0", "1", "2", "3", 
+                       "4", "5", "6", "7", 
+                       "8", "9", "10", "11", 
+                       "12", "13", "14", "15"]
+  
+  target_link_names: [ "tf_tip_center", "if_tip_center", "mf_tip_center", "rf_tip_center" ]
+
+  target_link_weights: [ 1, 1, 1, 1 ]
+  target_link_offsets:
+    tf_tip_center: [null, null]
+    if_tip_center: [null, null]
+    mf_tip_center: [null, null]
+    rf_tip_center: [null, null]
+    # root: [ [ 0.030, 0, 0 ], null ]
+    # LINK_F0_IP_R: [ [ 0.030, -0.001, 0 ], null ]
+    # LINK_F1_DIP_R: [ [ 0.020, -0.001, 0 ], null ]
+    # LINK_F2_DIP_R: [ [ 0.030, -0.001, 0 ], null ]
+    # LINK_F3_DIP_R: [ [ 0.035, 0, 0 ], null ]
+    # LINK_F4_DIP_R: [ [ 0.035, 0, 0 ], null ]
+
+  # Source refers to the retargeting input, which usually corresponds to the human hand
+  # The joint indices of human hand joint which corresponds to each link in the target_link_names
+  target_link_human_indices: [  4, 9, 14, 19 ]
+
+  scaling_factor: 1.6
+
+  # optimize root link pose to find a solution
+  add_dummy_free_joint: False
+
+  # To ignore the mimic joint tags in the URDF, set it to True
+  ignore_mimic_joint: False
+  
+  # A smaller alpha means stronger filtering, i.e. more smooth but also larger latency
+  low_pass_alpha: 0.8

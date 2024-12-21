@@ -32,8 +32,6 @@ class RetargetingConfig:
 
     # Position retargeting link names
     target_link_names: Optional[List[str]] = None
-    target_link_offsets: Optional[Dict] = None
-    target_link_weights: Optional[List[float]] = None
 
     # Vector retargeting link names
     target_joint_names: Optional[List[str]] = None
@@ -173,8 +171,6 @@ class RetargetingConfig:
                 joint_names,
                 target_link_names=self.target_link_names,
                 target_link_human_indices=self.target_link_human_indices,
-                target_link_weights=self.target_link_weights,
-                target_link_offsets=self.target_link_offsets,
                 norm_delta=self.normal_delta,
                 huber_delta=self.huber_delta,
                 scaling=self.scaling_factor,
